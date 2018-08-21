@@ -308,10 +308,10 @@ class Emitter:
             if is_same_type(value_type, typ):
                 if declare_dest:
                     self.emit_line('PyObject *{};'.format(dest))
-                self.emit_arg_check(src, dest, typ, '({} != Py_None)'.format(src), optional)
+                self.emit_arg_check(src, dest, typ, '{} != Py_None'.format(src), optional)
                 self.emit_lines(
-                    '    {} = {};'.format(dest, src),
-                    'else {',
+                    '{} = {};'.format(dest, src),
+                    '} else {',
                     err,
                     '{} = NULL;'.format(dest),
                     '}')
@@ -339,41 +339,41 @@ class Emitter:
                 prefix = 'PyBool'
             else:
                 assert False, prefix
-            self.emit_arg_check(src, dest, typ, '({}_Check({}))'.format(prefix, src), optional)
+            self.emit_arg_check(src, dest, typ, '{}_Check({})'.format(prefix, src), optional)
             self.emit_lines(
-                '    {} = {};'.format(dest, src),
-                'else {',
+                '{} = {};'.format(dest, src),
+                '} else {',
                 err,
                 '{} = NULL;'.format(dest),
                 '}')
         elif is_tuple_rprimitive(typ):
             if declare_dest:
                 self.emit_line('{} {};'.format(self.ctype(typ), dest))
-            self.emit_arg_check(src, dest, typ, '(PyTuple_Check({}))'.format(src), optional)
+            self.emit_arg_check(src, dest, typ, 'PyTuple_Check({})'.format(src), optional)
             self.emit_lines(
-                '    {} = {};'.format(dest, src),
-                'else {',
+                '{} = {};'.format(dest, src),
+                '} else {',
                 err,
                 '{} = NULL;'.format(dest),
                 '}')
         elif isinstance(typ, RInstance):
             if declare_dest:
                 self.emit_line('PyObject *{};'.format(dest))
-            self.emit_arg_check(src, dest, typ, '(PyObject_TypeCheck({}, {}))'.format(src,
+            self.emit_arg_check(src, dest, typ, 'PyObject_TypeCheck({}, {})'.format(src,
                     self.type_struct_name(typ.class_ir)), optional)
             self.emit_lines(
-                '    {} = {};'.format(dest, src),
-                'else {',
+                '{} = {};'.format(dest, src),
+                '} else {',
                 err,
                 '{} = NULL;'.format(dest),
                 '}')
         elif is_none_rprimitive(typ):
             if declare_dest:
                 self.emit_line('PyObject *{};'.format(dest))
-            self.emit_arg_check(src, dest, typ, '({} == Py_None)'.format(src), optional)
+            self.emit_arg_check(src, dest, typ, '{} == Py_None'.format(src), optional)
             self.emit_lines(
-                '    {} = {};'.format(dest, src),
-                'else {',
+                '{} = {};'.format(dest, src),
+                '} else {',
                 err,
                 '{} = NULL;'.format(dest),
                 '}')
@@ -453,9 +453,9 @@ class Emitter:
             self.emit_line('if ({} == NULL) {{'.format(src))
             self.emit_line('{} = {};'.format(dest, self.c_error_value(typ)))
         if check != '':
-            self.emit_line('{}if {}'.format('} else ' if optional else '', check))
+            self.emit_line('{}if ({}) {{'.format('} else ' if optional else '', check))
         elif optional:
-            self.emit_line('else {')
+            self.emit_line('} else {')
 
     def emit_unbox(self, src: str, dest: str, typ: RType, custom_failure: Optional[str] = None,
                    declare_dest: bool = False, borrow: bool = False,
@@ -487,23 +487,24 @@ class Emitter:
         if is_int_rprimitive(typ):
             if declare_dest:
                 self.emit_line('CPyTagged {};'.format(dest))
-            self.emit_arg_check(src, dest, typ, '(PyLong_Check({}))'.format(src), optional)
+            self.emit_arg_check(src, dest, typ, 'PyLong_Check({})'.format(src), optional)
             if borrow:
-                self.emit_line('    {} = CPyTagged_BorrowFromObject({});'.format(dest, src))
+                self.emit_line('{} = CPyTagged_BorrowFromObject({});'.format(dest, src))
             else:
-                self.emit_line('    {} = CPyTagged_FromObject({});'.format(dest, src))
-            self.emit_line('else {')
+                self.emit_line('{} = CPyTagged_FromObject({});'.format(dest, src))
+            self.emit_line('} else {')
             self.emit_lines(*failure)
             self.emit_line('}')
         elif is_bool_rprimitive(typ):
             # Whether we are borrowing or not makes no difference.
             if declare_dest:
                 self.emit_line('char {};'.format(dest))
-            self.emit_arg_check(src, dest, typ, '(!PyBool_Check({})) {{'.format(src), optional)
-            self.emit_lines(*failure)
-            self.emit_line('} else')
+            self.emit_arg_check(src, dest, typ, 'PyBool_Check({})'.format(src), optional)
             conversion = 'PyObject_IsTrue({})'.format(src)
-            self.emit_line('    {} = {};'.format(dest, conversion))
+            self.emit_line('{} = {};'.format(dest, conversion))
+            self.emit_line('} else {')
+            self.emit_lines(*failure)
+            self.emit_line('}')
         elif isinstance(typ, RTuple):
             self.declare_tuple_struct(typ)
             if declare_dest:
