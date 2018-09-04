@@ -142,6 +142,8 @@ def build_ir(modules: List[MypyFile],
     # Compute vtables.
     for cir in class_irs:
         compute_vtable(cir)
+    # Compute subclasses.
+    compute_subclasses(class_irs)
 
     return mapper.literals, result
 
@@ -238,6 +240,15 @@ def compute_vtable(cls: ClassIR) -> None:
         for trait in all_traits:
             compute_vtable(trait)
             cls.trait_vtables[trait] = specialize_parent_vtable(cls, trait)
+
+
+def compute_subclasses(class_irs: List[ClassIR]) -> None:
+    """Compute set of concrete subclasses for each class."""
+    for cir in class_irs:
+        if cir.is_trait:
+            continue
+        for base in cir.mro[1:]:
+            base.subclasses.add(cir)
 
 
 class Mapper:
